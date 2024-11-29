@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/cfoxon/hivego"
+	"github.com/deathwingtheboss/hivego"
 	"github.com/decred/dcrd/dcrec/secp256k1/v2"
 )
 
