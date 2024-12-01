@@ -55,35 +55,39 @@ func (h *HiveRpcNode) StreamBlocks() (<-chan types.Block, error) {
 	blockChan := make(chan types.Block)
 
 	go func() {
+		defer close(blockChan)
+
 		dynProps := hrpcQuery{method: "condenser_api.get_dynamic_global_properties", params: []string{}}
 		res, err := h.rpcExec(h.address, dynProps)
 		if err != nil {
-			log.Fatalf("Failed to fetch dynamic global properties: %v", err)
-			close(blockChan)
+			log.Printf("Failed to fetch initial head block: %v", err)
 			return
 		}
 
 		var props globalProps
 		err = json.Unmarshal(res, &props)
 		if err != nil {
-			log.Fatalf("Failed to unmarshal dynamic global properties: %v", err)
-			close(blockChan)
+			log.Printf("Failed to unmarshal initial head block: %v", err)
 			return
 		}
 
-		currentBlock := props.HeadBlockNumber
+		currentBlock := props.HeadBlockNumber + 1
 
 		for {
 			blockData, err := h.GetBlock(currentBlock)
 			if err != nil {
-				log.Printf("Error fetching block %d: %v\n. Retrying in 3 seconds...", currentBlock, err)
-				time.Sleep(failureWaitTime)
+				log.Printf("Error fetching block %d: %v. Waiting for block to be available...", currentBlock, err)
+				time.Sleep(retryWaitTime)
+				continue
+			}
+
+			if blockData.BlockID == "" || blockData.Witness == "" {
+				time.Sleep(retryWaitTime)
 				continue
 			}
 
 			blockChan <- blockData
 			currentBlock++
-			time.Sleep(retryWaitTime)
 		}
 	}()
 
